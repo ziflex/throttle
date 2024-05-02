@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+func currentTime() (time.Time, error) {
+	return time.Now(), nil
+}
+
 func TestThrottler_Wait_Consistent(t *testing.T) {
 	useCases := []struct {
 		Limit uint64
@@ -35,12 +39,12 @@ func TestThrottler_Wait_Consistent(t *testing.T) {
 	for _, useCase := range useCases {
 		t.Run(fmt.Sprintf("Consistent %d RPS within %d calls", useCase.Limit, useCase.Calls), func(t *testing.T) {
 			calls := make(chan time.Time, useCase.Calls)
-			call := func(t *throttle.Throttler) {
-				t.Wait()
-				calls <- time.Now()
+			call := func(t *throttle.Throttler[time.Time]) {
+				ts, _ := t.Do(currentTime)
+				calls <- ts
 			}
 
-			throttler := throttle.New(useCase.Limit)
+			throttler := throttle.New[time.Time](useCase.Limit)
 			ts := time.Now()
 			wg := sync.WaitGroup{}
 			wg.Add(useCase.Calls)
@@ -143,16 +147,16 @@ func TestThrottler_Wait_Sporadic(t *testing.T) {
 			}
 
 			calls := make(chan time.Time, totalCalls)
-			call := func(t *throttle.Throttler, latency time.Duration) {
+			call := func(t *throttle.Throttler[time.Time], latency time.Duration) {
 				if latency > 0 {
 					time.Sleep(latency)
 				}
 
-				t.Wait()
-				calls <- time.Now()
+				ts, _ := t.Do(currentTime)
+				calls <- ts
 			}
 
-			throttler := throttle.New(useCase.Limit)
+			throttler := throttle.New[time.Time](useCase.Limit)
 			ts := time.Now()
 			var wg sync.WaitGroup
 			wg.Add(totalCalls)

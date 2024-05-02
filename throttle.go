@@ -5,36 +5,51 @@ import (
 	"time"
 )
 
-type Throttler struct {
-	mu      sync.Mutex
-	window  time.Time
-	counter uint64
-	limit   uint64
+type (
+	// Fn represents a function that returns a value of type T and an error.
+	Fn[T any] func() (T, error)
+
+	// Throttler manages the execution of operations so that they don't exceed a specified rate limit.
+	Throttler[T any] struct {
+		mu      sync.Mutex
+		window  time.Time
+		counter uint64
+		limit   uint64
+	}
+)
+
+// New creates a new instance of Throttler with a specified limit.
+func New[T any](limit uint64) *Throttler[T] {
+	return &Throttler[T]{
+		limit: limit,
+	}
 }
 
-func New(limit uint64) *Throttler {
-	t := new(Throttler)
-	t.limit = limit
-
-	return t
-}
-
-func (t *Throttler) Wait() {
+// Do executes the provided function fn if the rate limit has not been reached.
+// It ensures that the operation respects the throttling constraints.
+func (t *Throttler[T]) Do(fn Fn[T]) (T, error) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
+	t.advance()
+	res, err := fn()
+	t.mu.Unlock()
 
+	return res, err
+}
+
+// advance updates the throttler state, advancing the window or incrementing the counter as necessary.
+func (t *Throttler[T]) advance() {
 	now := time.Now()
 
-	// if first call
+	// if this is the first operation, initialize the window
 	if t.window.IsZero() {
 		t.window = now
 	}
 
 	sinceLastCall := now.Sub(t.window)
 
-	// if we are past the current window
-	// start a new one and exit
+	// if the current window has expired
 	if sinceLastCall > time.Second {
+		// start a new window
 		t.reset(now)
 
 		return
@@ -42,24 +57,23 @@ func (t *Throttler) Wait() {
 
 	nextCount := t.counter + 1
 
-	// if we are in the limit and there is enough time left to process next operation
-	// we increase the counter and move on
+	// if adding another operation doesn't exceed the limit
 	if t.limit >= nextCount {
+		// increment the counter
 		t.counter = nextCount
 
 		return
 	}
 
-	leftInWindow := time.Second - sinceLastCall
+	// if the limit is reached, wait until the current window expires
+	time.Sleep(time.Second - sinceLastCall)
 
-	// otherwise wait for the next window
-	time.Sleep(leftInWindow)
-
-	// new window
+	// after sleeping, reset to a new window starting now
 	t.reset(time.Now())
 }
 
-func (t *Throttler) reset(window time.Time) {
+// reset starts a new window from the specified start time and resets the operation counter.
+func (t *Throttler[T]) reset(window time.Time) {
 	t.window = window
 	t.counter = 1
 }
