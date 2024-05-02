@@ -38,6 +38,11 @@ func (t *Throttler[T]) Do(fn Fn[T]) (T, error) {
 
 // advance updates the throttler state, advancing the window or incrementing the counter as necessary.
 func (t *Throttler[T]) advance() {
+	// pass through
+	if t.limit == 0 {
+		return
+	}
+	
 	now := time.Now()
 
 	// if this is the first operation, initialize the window

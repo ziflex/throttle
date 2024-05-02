@@ -19,6 +19,10 @@ func TestThrottler_Wait_Consistent(t *testing.T) {
 		Calls int
 	}{
 		{
+			Limit: 0,
+			Calls: 10,
+		},
+		{
 			Limit: 1,
 			Calls: 10,
 		},
@@ -70,6 +74,10 @@ func TestThrottler_Wait_Consistent(t *testing.T) {
 			expected := useCase.Limit
 
 			for _, actual := range groups {
+				if expected == 0 {
+					expected = uint64(useCase.Calls)
+				}
+
 				if actual > expected {
 					t.Fatal(fmt.Sprintf("Expected %d per second, but got %d", expected, actual))
 				}
