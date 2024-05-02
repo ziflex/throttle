@@ -15,30 +15,30 @@ go get github.com/ziflex/throttle
 package myapp
 
 import (
-	"context"
-	"net/http"
-	"github.com/ziflex/throttle"
+    "context"
+    "net/http"
+    "github.com/ziflex/throttle"
 )
 
 type ApiClient struct {
-	transport *http.Client
-	throttler *throttle.Throttler[*http.Response]
+    transport *http.Client
+    throttler *throttle.Throttler[*http.Response]
 }
 
 func NewApiClient(rps uint64) *ApiClient {
-	return &ApiClient{
-		transport: &http.Client{},
-		throttler: throttle.New[*http.Response](rps),
-	}
+    return &ApiClient{
+        transport: &http.Client{},
+        throttler: throttle.New[*http.Response](rps),
+    }
 }
 
 func (c *ApiClient) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
-	return c.throttler.Do(func() (*http.Response, error) {
-		select {
-		case <-ctx.Done():
-            return nil, ctx.Err()
-		default: 
-			return c.transport.Do(req)
+    return c.throttler.Do(func() (*http.Response, error) {
+        select {
+            case <-ctx.Done():
+                return nil, ctx.Err()
+            default: 
+                return c.transport.Do(req)
         }
     })
 }
