@@ -19,14 +19,22 @@ func buildOptions(setters []Option) *options {
 		setter(opts)
 	}
 
+	if opts.clockOffset == nil {
+		opts.clockOffset = zeroClockOffset
+	}
+
 	return opts
+}
+
+func zeroClockOffset(_ time.Duration) time.Duration {
+	return 0
 }
 
 // WithStaticClockOffset returns an Option that sets the static clock offset in the throttler options.
 // This is useful for adding extra time to the throttle's wait periods, for example, to account for clock skew.
 func WithStaticClockOffset(offset time.Duration) Option {
 	return func(opts *options) {
-		opts.clockOffset = func() time.Duration {
+		opts.clockOffset = func(_ time.Duration) time.Duration {
 			return offset
 		}
 	}
