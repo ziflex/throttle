@@ -5,23 +5,31 @@ import (
 	"time"
 )
 
+const windowSize = time.Second
+
 type (
+	ClockOffsetProvider func(sleepDur time.Duration) time.Duration
+
 	// Fn represents a function that returns a value of type T and an error.
 	Fn[T any] func() (T, error)
 
 	// Throttler manages the execution of operations so that they don't exceed a specified rate limit.
 	Throttler[T any] struct {
-		mu      sync.Mutex
-		window  time.Time
-		counter uint64
-		limit   uint64
+		mu          sync.Mutex
+		window      time.Time
+		clockOffset ClockOffsetProvider
+		counter     uint64
+		limit       uint64
 	}
 )
 
 // New creates a new instance of Throttler with a specified limit.
-func New[T any](limit uint64) *Throttler[T] {
+func New[T any](limit uint64, setters ...Option) *Throttler[T] {
+	opts := buildOptions(setters)
+
 	return &Throttler[T]{
-		limit: limit,
+		limit:       limit,
+		clockOffset: opts.clockOffset,
 	}
 }
 
@@ -49,10 +57,10 @@ func (t *Throttler[T]) advance() {
 		t.window = now
 	}
 
-	sinceLastCall := now.Sub(t.window)
+	windowDur := now.Sub(t.window)
 
 	// if the current window has expired
-	if sinceLastCall > time.Second {
+	if windowDur > windowSize {
 		// start a new window
 		t.reset(now)
 
@@ -69,8 +77,11 @@ func (t *Throttler[T]) advance() {
 		return
 	}
 
+	sleepDur := windowSize - windowDur
+
 	// if the limit is reached, wait until the current window expires
-	time.Sleep(time.Second - sinceLastCall)
+	// we use an optional clock offset to account for clock skew.
+	time.Sleep(sleepDur + t.clockOffset(sleepDur))
 
 	// after sleeping, reset to a new window starting now
 	t.reset(time.Now())
