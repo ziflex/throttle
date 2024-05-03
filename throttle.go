@@ -30,10 +30,9 @@ func New[T any](limit uint64) *Throttler[T] {
 func (t *Throttler[T]) Do(fn Fn[T]) (T, error) {
 	t.mu.Lock()
 	t.advance()
-	res, err := fn()
 	t.mu.Unlock()
 
-	return res, err
+	return fn()
 }
 
 // advance updates the throttler state, advancing the window or incrementing the counter as necessary.
@@ -42,7 +41,7 @@ func (t *Throttler[T]) advance() {
 	if t.limit == 0 {
 		return
 	}
-	
+
 	now := time.Now()
 
 	// if this is the first operation, initialize the window
