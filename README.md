@@ -46,43 +46,32 @@ func (c *ApiClient) Do(ctx context.Context, req *http.Request) (*http.Response, 
 
 ## Options
 
-### Clock offset
-Since client and server machines have different clocks they are probably out of sync, thus you might want to add a clock offset between the throttler's time windows.
-
-#### Static offset
-Just a static value
+### Clock
+`Clock` type is an interface that allows you to provide custom clock mechanism that's different from the system one.   
+It has just 2 methods: ``Now()`` and ``Sleep(time.Duration)``.   
+It might be useful to use a custom implementation to provide a more nuanced timing mechanism. 
 
 ```go
 package myapp
 
 import (
-	"time"
-	"github.com/ziflex/throttle"
+    "time"
+    "github.com/ziflex/throttle"
 )
 
-func main() {
-	throttler := throttle.New[any](10, throttle.WithStaticClockOffset(time.Millisecond * 250))	
+type MyClock struct {
+    offset time.Duration
 }
-```
 
-#### Dynamic offset
-A function the receives the calculated sleep duration and returns an offset that is added to it:
+func (c *MyClock) Now() time.Time {
+    return time.Now().Add(c.offset)
+}
 
-```go
-package myapp
-
-import (
-	"time"
-	"github.com/ziflex/throttle"
-)
+func (c *MyClock) Sleep(dur time.Duration) {
+    time.Sleep(dur + c.offset)
+}
 
 func main() {
-	throttler := throttle.New[any](10, throttle.WithDynamicClockOffset(func(sleepDur time.Duration) time.Duration {
-        if sleepDur < (time.Millisecond * 100) {
-			return time.Millisecond * 100
-        }
-		
-		return sleepDur
-	}))	
+    throttler := throttle.New[any](10, throttle.WithClock(&MyClock{time.Millisecond * 250}))
 }
 ```

@@ -1,12 +1,9 @@
 package throttle
 
-import "time"
-
 type (
 	// options holds configuration settings for the throttler.
 	options struct {
-		// additional time to be added when calculating sleep durations
-		clockOffset ClockOffsetProvider
+		clock Clock
 	}
 
 	Option func(opts *options)
@@ -19,31 +16,16 @@ func buildOptions(setters []Option) *options {
 		setter(opts)
 	}
 
-	if opts.clockOffset == nil {
-		opts.clockOffset = zeroClockOffset
+	if opts.clock == nil {
+		opts.clock = &DefaultClock{}
 	}
 
 	return opts
 }
 
-func zeroClockOffset(_ time.Duration) time.Duration {
-	return 0
-}
-
-// WithStaticClockOffset returns an Option that sets the static clock offset in the throttler options.
-// This is useful for adding extra time to the throttle's wait periods, for example, to account for clock skew.
-func WithStaticClockOffset(offset time.Duration) Option {
+// WithClock sets a custom implementation of Clock interface.
+func WithClock(clock Clock) Option {
 	return func(opts *options) {
-		opts.clockOffset = func(_ time.Duration) time.Duration {
-			return offset
-		}
-	}
-}
-
-// WithDynamicClockOffset returns an Option that sets the dynamic clock offset in the throttler options.
-// This is useful for adding extra time to the throttle's wait periods, for example, to account for clock skew.
-func WithDynamicClockOffset(provider ClockOffsetProvider) Option {
-	return func(opts *options) {
-		opts.clockOffset = provider
+		opts.clock = clock
 	}
 }
