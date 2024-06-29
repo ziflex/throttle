@@ -22,25 +22,25 @@ import (
 
 type ApiClient struct {
     transport *http.Client
-    throttler *throttle.Throttler[*http.Response]
+    throttler *throttle.Throttler
 }
 
 func NewApiClient(rps uint64) *ApiClient {
     return &ApiClient{
         transport: &http.Client{},
-        throttler: throttle.New[*http.Response](rps),
+        throttler: throttle.New(rps),
     }
 }
 
 func (c *ApiClient) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
-    return c.throttler.Do(func() (*http.Response, error) {
-        select {
-            case <-ctx.Done():
-                return nil, ctx.Err()
-            default: 
-                return c.transport.Do(req)
-        }
-    })
+	c.throttler.Acquire()
+	
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		return c.transport.Do(req)
+	}
 }
 ```
 
@@ -72,6 +72,30 @@ func (c *MyClock) Sleep(dur time.Duration) {
 }
 
 func main() {
-    throttler := throttle.New[any](10, throttle.WithClock(&MyClock{time.Millisecond * 250}))
+    throttler := throttle.New(10, throttle.WithClock(&MyClock{time.Millisecond * 250}))
+}
+```
+
+## Helpers
+### RoundTripper
+The package contains a helper that wraps the standard `http.RoundTripper` interface and provides a throttling mechanism.
+
+```go
+package myapp
+
+import (
+    "context"
+    "net/http"
+    "github.com/ziflex/throttle"
+)
+
+func main() {
+    transport := &http.Transport{}
+    client := &http.Client{
+        Transport: throttle.NewRoundTripper(transport, 10),
+    }
+
+    req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+    client.Do(req)
 }
 ```

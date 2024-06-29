@@ -43,7 +43,7 @@ func TestThrottler_Do_Consistent(t *testing.T) {
 	for _, useCase := range useCases {
 		t.Run(fmt.Sprintf("Consistent %d RPS within %d calls", useCase.Limit, useCase.Calls), func(t *testing.T) {
 			calls := make(chan time.Time, useCase.Calls)
-			throttler := throttle.New[time.Time](useCase.Limit)
+			throttler := throttle.New(useCase.Limit)
 			ts := time.Now()
 
 			var wg sync.WaitGroup
@@ -51,11 +51,8 @@ func TestThrottler_Do_Consistent(t *testing.T) {
 
 			for range useCase.Calls {
 				go func() {
-					res, _ := throttler.Do(func() (time.Time, error) {
-						return time.Now(), nil
-					})
-
-					calls <- res
+					throttler.Acquire()
+					calls <- time.Now()
 					wg.Done()
 				}()
 			}
@@ -152,7 +149,7 @@ func TestThrottler_Do_Sporadic(t *testing.T) {
 			}
 
 			calls := make(chan time.Time, buffer)
-			throttler := throttle.New[time.Time](useCase.Limit)
+			throttler := throttle.New(useCase.Limit)
 			ts := time.Now()
 
 			var wg sync.WaitGroup
@@ -169,19 +166,13 @@ func TestThrottler_Do_Sporadic(t *testing.T) {
 					}
 
 					for range callNum {
-						res, _ := throttler.Do(func() (time.Time, error) {
-							if latency > 0 {
-								time.Sleep(latency)
-							}
+						throttler.Acquire()
 
-							return time.Now(), nil
-						})
+						if latency > 0 {
+							time.Sleep(latency)
+						}
 
-						calls <- res
-
-						//ts := time.Now()
-
-						//fmt.Println(fmt.Sprintf("Call %dms", time.Since(ts).Milliseconds()))
+						calls <- time.Now()
 					}
 
 					wg.Done()
@@ -301,7 +292,7 @@ func TestThrottler_Do_Parallel(t *testing.T) {
 	for _, useCase := range useCases {
 		t.Run(fmt.Sprintf("Parallel %d RPS", useCase.Limit), func(t *testing.T) {
 			calls := make(chan time.Time, len(useCase.Calls))
-			throttler := throttle.New[time.Time](useCase.Limit)
+			throttler := throttle.New(useCase.Limit)
 			ts := time.Now()
 
 			var wg sync.WaitGroup
@@ -311,18 +302,13 @@ func TestThrottler_Do_Parallel(t *testing.T) {
 				go func(latency time.Duration) {
 					defer wg.Done()
 
-					// callTs := time.Now()
-					res, _ := throttler.Do(func() (time.Time, error) {
-						if latency > 0 {
-							time.Sleep(latency)
-						}
+					throttler.Acquire()
 
-						return time.Now(), nil
-					})
+					if latency > 0 {
+						time.Sleep(latency)
+					}
 
-					calls <- res
-
-					// fmt.Println(fmt.Sprintf("Call %dms", time.Since(callTs).Milliseconds()))
+					calls <- time.Now()
 				}(tpl.Latency)
 			}
 

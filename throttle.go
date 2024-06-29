@@ -7,42 +7,34 @@ import (
 
 const windowSize = time.Second
 
-type (
-	// Fn represents a function that returns a value of type T and an error.
-	Fn[T any] func() (T, error)
-
-	// Throttler manages the execution of operations so that they don't exceed a specified rate limit.
-	Throttler[T any] struct {
-		mu      sync.Mutex
-		window  time.Time
-		clock   Clock
-		counter uint64
-		limit   uint64
-	}
-)
+// Throttler manages the execution of operations so that they don't exceed a specified rate limit.
+type Throttler struct {
+	mu      sync.Mutex
+	window  time.Time
+	clock   Clock
+	counter uint64
+	limit   uint64
+}
 
 // New creates a new instance of Throttler with a specified limit.
-func New[T any](limit uint64, setters ...Option) *Throttler[T] {
+func New(limit uint64, setters ...Option) *Throttler {
 	opts := buildOptions(setters)
 
-	return &Throttler[T]{
+	return &Throttler{
 		limit: limit,
 		clock: opts.clock,
 	}
 }
 
-// Do executes the provided function fn if the rate limit has not been reached.
-// It ensures that the operation respects the throttling constraints.
-func (t *Throttler[T]) Do(fn Fn[T]) (T, error) {
+// Acquire blocks until the operation can be executed within the rate limit.
+func (t *Throttler) Acquire() {
 	t.mu.Lock()
 	t.advance()
 	t.mu.Unlock()
-
-	return fn()
 }
 
 // advance updates the throttler state, advancing the window or incrementing the counter as necessary.
-func (t *Throttler[T]) advance() {
+func (t *Throttler) advance() {
 	// pass through
 	if t.limit == 0 {
 		return
@@ -87,7 +79,7 @@ func (t *Throttler[T]) advance() {
 }
 
 // reset starts a new window from the specified start time and resets the operation counter.
-func (t *Throttler[T]) reset(window time.Time) {
+func (t *Throttler) reset(window time.Time) {
 	t.window = window
 	t.counter = 1
 }
