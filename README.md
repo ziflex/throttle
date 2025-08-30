@@ -335,11 +335,12 @@ func main() {
     // Create a throttled HTTP client (max 10 requests per second)
     client := &http.Client{
         Transport: throttle.NewRoundTripper(http.DefaultTransport, 10),
+        Timeout:   30 * time.Second, // Add timeout for safety
     }
     
     // All requests through this client will be throttled
     for i := 0; i < 20; i++ {
-        resp, err := client.Get("https://httpbin.org/get")
+        resp, err := client.Get("https://api.example.com/endpoint")
         if err != nil {
             fmt.Printf("Request %d failed: %v\n", i+1, err)
             continue
@@ -385,7 +386,7 @@ func main() {
 
 func makeRequests(client *http.Client, name string) {
     for i := 0; i < 10; i++ {
-        resp, _ := client.Get("https://httpbin.org/get")
+        resp, _ := client.Get("https://api.example.com/endpoint")
         if resp != nil {
             resp.Body.Close()
             fmt.Printf("%s - Request %d completed\n", name, i+1)
