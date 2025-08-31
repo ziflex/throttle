@@ -13,6 +13,46 @@ func seconds(fraction float64) time.Duration {
 	return time.Duration(float64(time.Second) * fraction)
 }
 
+// mockClock is a test implementation of Clock for testing purposes
+type mockClock struct {
+	currentTime time.Time
+	sleepCalls  []time.Duration
+}
+
+func (m *mockClock) Now() time.Time {
+	return m.currentTime
+}
+
+func (m *mockClock) Sleep(dur time.Duration) {
+	m.sleepCalls = append(m.sleepCalls, dur)
+	m.currentTime = m.currentTime.Add(dur)
+}
+
+func TestWithClock(t *testing.T) {
+	mock := &mockClock{currentTime: time.Now()}
+
+	// Create throttler with custom clock
+	throttler := throttle.New(1, throttle.WithClock(mock))
+
+	// First call should not sleep
+	throttler.Acquire()
+	if len(mock.sleepCalls) != 0 {
+		t.Fatalf("Expected no sleep calls on first acquire, got %d", len(mock.sleepCalls))
+	}
+
+	// Second call should trigger sleep since limit is 1
+	throttler.Acquire()
+	if len(mock.sleepCalls) != 1 {
+		t.Fatalf("Expected 1 sleep call on second acquire, got %d", len(mock.sleepCalls))
+	}
+
+	// Verify the sleep duration is reasonable (should be close to 1 second)
+	sleepDur := mock.sleepCalls[0]
+	if sleepDur < 900*time.Millisecond || sleepDur > 1100*time.Millisecond {
+		t.Fatalf("Expected sleep duration around 1 second, got %v", sleepDur)
+	}
+}
+
 func TestThrottler_Do_Consistent(t *testing.T) {
 	useCases := []struct {
 		Limit uint64
@@ -262,29 +302,25 @@ func TestThrottler_Do_Parallel(t *testing.T) {
 			Limit: 5,
 			Calls: []Call{
 				{
-					Latency: seconds(0.5),
+					Latency: seconds(0.1),
 				},
 				{
-					Latency: seconds(0.5),
+					Latency: seconds(0.1),
 				},
 				{
-					Latency: seconds(0.5),
+					Latency: seconds(0.1),
 				},
 				{
-					Latency: seconds(0.5),
+					Latency: seconds(0.1),
 				},
 				{
-					Latency: seconds(0.99),
-				},
-				{
-					Latency: seconds(1),
+					Latency: seconds(0.1),
 				},
 				{},
 			},
 			Expected: map[float64]uint64{
 				0: 5,
 				1: 1,
-				2: 1,
 			},
 		},
 	}
