@@ -92,7 +92,7 @@ func TestThrottledRoundTripper_RoundTrip(t *testing.T) {
 
 	// Execute requests and measure timing
 	start := time.Now()
-	
+
 	resp1, err1 := transport.RoundTrip(req1)
 	if err1 != nil {
 		t.Fatalf("First request failed: %v", err1)

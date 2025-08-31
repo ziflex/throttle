@@ -30,22 +30,22 @@ func (m *mockClock) Sleep(dur time.Duration) {
 
 func TestWithClock(t *testing.T) {
 	mock := &mockClock{currentTime: time.Now()}
-	
+
 	// Create throttler with custom clock
 	throttler := throttle.New(1, throttle.WithClock(mock))
-	
+
 	// First call should not sleep
 	throttler.Acquire()
 	if len(mock.sleepCalls) != 0 {
 		t.Fatalf("Expected no sleep calls on first acquire, got %d", len(mock.sleepCalls))
 	}
-	
+
 	// Second call should trigger sleep since limit is 1
 	throttler.Acquire()
 	if len(mock.sleepCalls) != 1 {
 		t.Fatalf("Expected 1 sleep call on second acquire, got %d", len(mock.sleepCalls))
 	}
-	
+
 	// Verify the sleep duration is reasonable (should be close to 1 second)
 	sleepDur := mock.sleepCalls[0]
 	if sleepDur < 900*time.Millisecond || sleepDur > 1100*time.Millisecond {
